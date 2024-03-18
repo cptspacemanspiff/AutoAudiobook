@@ -1,0 +1,5 @@
+cache
+annotated
+.vscode
+*.txt
+**__pycache__
