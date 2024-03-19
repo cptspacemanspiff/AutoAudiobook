@@ -3,3 +3,4 @@ annotated
 .vscode
 *.txt
 **__pycache__
+downloads

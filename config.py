@@ -6,4 +6,4 @@ client = OpenAI()
 MODEL="gpt-3.5-turbo-0125"
 
 CACHE_DIRECTORY = Path("cache")
-CACHE = True
+CACHE = False

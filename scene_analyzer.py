@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 
 from utils.fuzzy_parsing import LLMEnum
+
+
 # Data Types:
 class PointOfViewType(LLMEnum):
     _llmLookup = {
@@ -17,6 +19,14 @@ class PointOfViewType(LLMEnum):
     THIRD_PERSON_LIMITED = 3
     THIRD_PERSON_OMNISCIENT = 4
 
+def splitSections(text: str):
+    # split the text into sections:
+    paragraphs = text.split("\n\n")
+
+    # determine if there is a scene change:
+    for i in range(len(paragraphs)):
+        
+    return sections
 
 def insertParagraphID(text: str):
     text = text.split("\n\n")
@@ -26,8 +36,62 @@ def insertParagraphID(text: str):
 
     return text
 
+def identifyCharacter(paragraphs: list[str], scene, character1):
+    text = "\n\n".join(paragraphs)
 
-def annotateSpeaker(paragraphs: list[str], possibleCharacters: list[str] = []):
+    systemPrompt = f"The following is a brief scene in a story, analyze who {character1} is in the context of the scene, respond in json"
+    systemPrompt +="""
+{
+    'aliases' : '[alias1, alias2, alias3]'
+    'purpose' : 'what is the character doing in the scene'
+    'emotionalState' : 'what is the character feeling in the scene'
+    'importance' : 'is the character a major, minor, or background character'
+}
+"""
+    prompts = [
+        {"role": "system", "content": systemPrompt},
+        {"role": "user", "content": text},
+    ]
+    print(prompts)
+    response = client.chat.completions.create(
+        model=MODEL,
+        response_format={"type": "json_object"},
+        messages=prompts,
+    )
+    print(response.choices[0].message.content)
+    return json.loads(response.choices[0].message.content)
+
+
+def analyzeRelation(paragraphs: list[str], scene, character1, character2):
+    text = "\n\n".join(paragraphs)
+
+    systemPrompt = "Read the following story what is the relationship between {character1} and {character2}, respond in json."
+# """
+# {
+#     'knows': "1 to 2 sentences describing the relationship"
+# }
+# """
+
+    # systemPrompt = (
+    #     systemPrompt
+    #     + f"The story is written in {scene['pointOfViewType']} and the narrator is {scene['pointOfView']}"
+    # )
+
+    # prompts = [
+    #     {"role": "system", "content": systemPrompt},
+    #     {"role": "user", "content": text},
+    # ]
+    # print(prompts)
+    # response = client.chat.completions.create(
+    #     model=MODEL,
+    #     response_format={"type": "json_object"},
+    #     messages=prompts,
+    # )
+    # print(response.choices[0].message.content)
+    # return json.loads(response.choices[0].message.content)
+
+
+def annotateSpeaker(paragraphs: list[str], scene):
     text = "\n\n".join(paragraphs)
     systemPrompt = """Parse the following scene and annotate the speaker for each paragraph. Return the output as json in the form of:
 {
@@ -37,10 +101,15 @@ def annotateSpeaker(paragraphs: list[str], possibleCharacters: list[str] = []):
     ]
 }
 """
-    if len(possibleCharacters) > 0:
+    if len(scene["characters"]) > 0:
         systemPrompt = (
-            systemPrompt + f"Possible speakers: {', '.join(possibleCharacters)}"
+            systemPrompt + f"Possible speakers: {', '.join(scene['characters'])} \n"
         )
+
+    systemPrompt = (
+        systemPrompt
+        + f"The story is written in {scene['pointOfViewType']} and the narrator is {scene['pointOfView']}"
+    )
 
     prompts = [
         {"role": "system", "content": systemPrompt},
@@ -59,13 +128,13 @@ def annotateSpeaker(paragraphs: list[str], possibleCharacters: list[str] = []):
 def summerizeScene(paragraphs: list[str]):
     text = "\n\n".join(paragraphs)
 
-    systemPrompt = """Parse the following scenes, return the output as json in the form of:
+    systemPrompt = """Read the following story, separating out the major sections, return the output as json in the form of:
 {
-    'scenes':[{
+    'section':[{
         'startID': 'Paragraph ID of the start of the scene',
         'sceneSummary': 'short paragraph summarizing the scene',
         'characters': [character1, character2, character3],
-        'PointOfViewType': 'The point of view writing style of the scene',
+        'pointOfViewType': 'The point of view writing style of the scene',
         'pointOfView': 'character1'
         'setting': 'location'
     }]
@@ -89,9 +158,10 @@ def summerizeScene(paragraphs: list[str]):
     # modify the pointOfView to be a PointOfViewType:
     for scene in data["scenes"]:
         scene["startID"] = int(scene["startID"])
-        scene["pointOfView"] = PointOfViewType(scene["pointOfView"])
+        # scene["pointOfViewType"] = str(PointOfViewType(scene["pointOfViewType"]))
 
     return data
+
 
 # this creates a new document and annotates line by line with the information.
 def annotateDocument(
